@@ -1,4 +1,4 @@
-# brimble-paas
+# drimble-paas
 
 A self-hosted PaaS pipeline that accepts a Git URL or a project upload, builds a container image with Railpack, runs it with Docker, and routes traffic through Caddy
 ---
@@ -54,7 +54,7 @@ A miniature deployment platform that illustrate a little what Dribble does in pr
 ---
 
 ## Architecture
-![Architecture Diagram](./brimble-deploy/docs/screenshots/image.png)
+![Architecture Diagram](./drimble-deploy/docs/screenshots/image.png)
 
 ### Pipeline flow
 
@@ -95,7 +95,7 @@ My first implementation for this task bsically made use of SSE log streaming usi
 
 The problem is that this breaks the moment you run two API instances. The RabbitMQ consumer picks up the deployment message on Instance 1. The user's browser opens an SSE connection to Instance 2. Instance 2's `EventEmitter` never receives the log events from Instance 1's pipeline worker. The SSE client receives nothing.
 
-I moved to Redis pub/sub. After each log line is persisted to PostgreSQL, the repository publishes it to a Redis channel keyed by deployment ID (`brimble:logs:<deploymentId>`). Each SSE client gets a dedicated subscriber connection created with `redisClient.duplicate()`. I use `duplicate()` because once ioredis enters subscriber mode permanently when teh `subscribe()` method is called, a connection in the subscriber mode will not be able to issue any other command, including `GET`, `SET`, or `PUBLISH`. The cache connection and the subscriber connection must be completely independent.
+I moved to Redis pub/sub. After each log line is persisted to PostgreSQL, the repository publishes it to a Redis channel keyed by deployment ID (`drimble:logs:<deploymentId>`). Each SSE client gets a dedicated subscriber connection created with `redisClient.duplicate()`. I use `duplicate()` because once ioredis enters subscriber mode permanently when teh `subscribe()` method is called, a connection in the subscriber mode will not be able to issue any other command, including `GET`, `SET`, or `PUBLISH`. The cache connection and the subscriber connection must be completely independent.
 
 The SSE controller subscribes before fetching existing logs from the DB. This ordering closes the race window: if a log line is published between the DB fetch and the subscribe call, it would be permanently missed. By subscribing first, those lines are buffered in ioredis and delivered after the catch-up fetch completes.
 
@@ -103,8 +103,8 @@ The SSE controller subscribes before fetching existing logs from the DB. This or
 
 Redis pub/sub provides at-most-once delivery. A message is delivered to subscribers currently connected at the moment of publish. If no subscriber is listening, the message is gone. If an SSE client disconnects and reconnects mid-build, every line published during the disconnection window is permanently lost from Redis. The client re-fetches from PostgreSQL on reconnect which recovers the lost lines, but it costs a DB read on every reconnect and breaks the SSE id: ordering guarantee.
 
-In theh case of Redis Streams, it will definitely provide me at-least-once delivery. Lines are written to the stream with XADD and persist until explicitly trimmed. A client that disconnects and reconnects calls XREAD COUNT 1000 STREAMS brimble:logs:<id> <lastId> where lastId is taken from the SSE Last-Event-ID header the browser sends automatically. The server replays exactly the lines that were missed, no DB round-trip involved. If the same line is delivered twice due to a crash between delivery and acknowledgement, the client deduplicates by sequence number. A duplicate is harmless. A missing line is not.
-Redis Streams (`XADD` / `XREAD BLOCK`) would give me at-least-once delivery with replay. The stream entry ID maps directly to the SSE `Last-Event-ID` header. On reconnect the browser sends the last received event ID and the server issues `XREAD COUNT 1000 STREAMS brimble:logs:<id> <lastId>` to replay exactly what was missed - no DB involved. Consumer groups let multiple API instances fan out stream entries without duplication.
+In theh case of Redis Streams, it will definitely provide me at-least-once delivery. Lines are written to the stream with XADD and persist until explicitly trimmed. A client that disconnects and reconnects calls XREAD COUNT 1000 STREAMS drimble:logs:<id> <lastId> where lastId is taken from the SSE Last-Event-ID header the browser sends automatically. The server replays exactly the lines that were missed, no DB round-trip involved. If the same line is delivered twice due to a crash between delivery and acknowledgement, the client deduplicates by sequence number. A duplicate is harmless. A missing line is not.
+Redis Streams (`XADD` / `XREAD BLOCK`) would give me at-least-once delivery with replay. The stream entry ID maps directly to the SSE `Last-Event-ID` header. On reconnect the browser sends the last received event ID and the server issues `XREAD COUNT 1000 STREAMS drimble:logs:<id> <lastId>` to replay exactly what was missed - no DB involved. Consumer groups let multiple API instances fan out stream entries without duplication.
 
 ### The Docker socket problem
 
@@ -179,7 +179,7 @@ event: done     → { status: "running" | "failed" }
 ## Project structure
 
 ```
-brimble-paas/
+drimble-paas/
 ├── app/
 │   ├── api/                          # Backend API
 │   │   ├── src/
@@ -225,7 +225,7 @@ brimble-paas/
 │       ├── package.json
 │       └── vite.config.ts
 │
-├── brimble-deploy/                   # Docker Compose stack and observability config
+├── drimble-deploy/                   # Docker Compose stack and observability config
 │   ├── grafana/                      # dashboard provisioning and JSON dashboards
 │   ├── loki/                         # Loki config
 │   ├── prometheus/                   # Prometheus scrape config
@@ -252,14 +252,14 @@ brimble-paas/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/edidiesky/brimble-paas
-cd brimble-paas
+git clone https://github.com/edidiesky/drimble-paas
+cd drimble-paas
 ```
 
 ### 2. Configure environment variables
 
 ```bash
-cp brimble-deploy/.env.sample brimble-deploy/.env
+cp drimble-deploy/.env.sample drimble-deploy/.env
 ```
 
 The `.env.sample` contains sensible defaults for every variable. The only values you must change before starting are the RabbitMQ credentials — the defaults will work but you should generate a proper password hash for `definitions.json`.
@@ -274,12 +274,12 @@ docker run --rm rabbitmq:3.13-management-alpine \
   rabbitmqctl hash_password fe61ff5b4a2517e14c7a9f410d1fa77aea7decaaab98895d5fec23b2239c146a
 ```
 
-Open `brimble-deploy/rabbitmq/definitions.json`, find the `users` array, and replace the `password_hash` value with the output of that command. The plaintext password in `.env` and the hash in `definitions.json` must correspond.
+Open `drimble-deploy/rabbitmq/definitions.json`, find the `users` array, and replace the `password_hash` value with the output of that command. The plaintext password in `.env` and the hash in `definitions.json` must correspond.
 
 ### 4. Start the stack
 
 ```bash
-cd brimble-deploy
+cd drimble-deploy
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
@@ -306,7 +306,7 @@ curl -X POST http://localhost/api/v1/deployments \
   -H "Content-Type: application/json" \
   -d '{
     "sourceType": "git",
-    "sourceRef": "https://github.com/edidiesky/brimble-ui",
+    "sourceRef": "https://github.com/edidiesky/drimble-ui",
     "name": "my-app"
   }'
 ```
@@ -365,12 +365,12 @@ I followed a 70/20/10 distribution:
 ## Observability
 
 ### HTTP Dashboard
-![HTTP Dashboard](./brimble-deploy/docs/screenshots/grafana%201.jpeg)
-![HTTP Latency](./brimble-deploy/docs/screenshots/grafana%202.jpeg)
+![HTTP Dashboard](./drimble-deploy/docs/screenshots/grafana%201.jpeg)
+![HTTP Latency](./drimble-deploy/docs/screenshots/grafana%202.jpeg)
 
 ### Pipeline Dashboard
-![Pipeline Overview](./brimble-deploy/docs/screenshots/pipeline_1.jpeg)
-![Pipeline Errors and Phase Duration](./brimble-deploy/docs/screenshots/pipeline_2.jpeg)
+![Pipeline Overview](./drimble-deploy/docs/screenshots/pipeline_1.jpeg)
+![Pipeline Errors and Phase Duration](./drimble-deploy/docs/screenshots/pipeline_2.jpeg)
 
 Grafana dashboards cover seven areas:
 
@@ -410,14 +410,14 @@ Three days. Day one was infrastructure setup - Docker Compose, RabbitMQ topology
 
 ## Sample app for testing
 
-Use [edidiesky/brimble-ui](https://github.com/edidiesky/brimble-ui) or any public Node.js, Python, or Go repository. Submit the Git URL through the UI or via:
+Use [edidiesky/drimble-ui](https://github.com/edidiesky/drimble-ui) or any public Node.js, Python, or Go repository. Submit the Git URL through the UI or via:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/deployments \
   -H "Content-Type: application/json" \
   -d '{
     "sourceType": "git",
-    "sourceRef": "https://github.com/edidiesky/brimble-ui",
+    "sourceRef": "https://github.com/edidiesky/drimble-ui",
     "name": "my-app"
   }'
 ```
