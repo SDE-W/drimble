@@ -1,0 +1,35 @@
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/.tanstack/
+
+# Environment
+.env
+.env.*
+!.env.sample
+
+# Logs
+*.log
+npm-debug.log*
+combined.log
+error.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Coverage
+**/coverage/
+
+# TypeScript build
+**/tsconfig.tsbuildinfo
+
+# Keep these
+!package.json
+!package-lock.json

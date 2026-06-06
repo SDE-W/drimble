@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: brimble-api
+    static_configs:
+      - targets: ["api:9464"]
+    metrics_path: /metrics
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq-exporter:9419"]
+
+  - job_name: mongodb
+    static_configs:
+      - targets: ["mongodb:27017"]

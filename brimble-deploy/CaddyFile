@@ -1,0 +1,26 @@
+{
+  admin 0.0.0.0:2019
+  auto_https off
+}
+
+:80 {
+  handle /caddy/health {
+    respond "ok" 200
+  }
+
+  handle /api/v1/deployments/*/logs {
+    reverse_proxy api:3000 {
+      flush_interval -1
+    }
+  }
+
+  handle /api/* {
+    reverse_proxy api:3000
+  }
+
+  handle {
+    root * /srv/ui
+    try_files {path} /index.html
+    file_server
+  }
+}

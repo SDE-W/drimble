@@ -1,0 +1,130 @@
+{
+  "users": [
+    {
+      "name": "brimble",
+      "password_hash": "8feSYqv0hse86qRLyWjn9bjI2LHPYQ6rPZeiIHKbML2wfLeO",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [{ "name": "brimble" }],
+  "permissions": [
+    {
+      "user": "brimble",
+      "vhost": "brimble",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "brimble.deployments.exchange",
+      "vhost": "brimble",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "brimble.deployments.dlx",
+      "vhost": "brimble",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "brimble.deployment.pipeline.queue",
+      "vhost": "brimble",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 3,
+        "x-dead-letter-exchange": "brimble.deployments.dlx",
+        "x-dead-letter-routing-key": "deployment.dead.topic"
+      }
+    },
+    {
+      "name": "brimble.deployment.completed.queue",
+      "vhost": "brimble",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "brimble.deployment.failed.queue",
+      "vhost": "brimble",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 3,
+        "x-dead-letter-exchange": "brimble.deployments.dlx",
+        "x-dead-letter-routing-key": "deployment.dead.topic"
+      }
+    },
+    {
+      "name": "brimble.deployment.dead.queue",
+      "vhost": "brimble",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "brimble.deployments.exchange",
+      "vhost": "brimble",
+      "destination": "brimble.deployment.pipeline.queue",
+      "destination_type": "queue",
+      "routing_key": "deployment.requested.topic",
+      "arguments": {}
+    },
+    {
+      "source": "brimble.deployments.exchange",
+      "vhost": "brimble",
+      "destination": "brimble.deployment.completed.queue",
+      "destination_type": "queue",
+      "routing_key": "deployment.completed.topic",
+      "arguments": {}
+    },
+    {
+      "source": "brimble.deployments.exchange",
+      "vhost": "brimble",
+      "destination": "brimble.deployment.failed.queue",
+      "destination_type": "queue",
+      "routing_key": "deployment.failed.topic",
+      "arguments": {}
+    },
+    {
+      "source": "brimble.deployments.dlx",
+      "vhost": "brimble",
+      "destination": "brimble.deployment.dead.queue",
+      "destination_type": "queue",
+      "routing_key": "deployment.dead.topic",
+      "arguments": {}
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "brimble",
+      "name": "ha-quorum",
+      "pattern": "brimble\\.deployment.*",
+      "definition": {
+        "queue-mode": "lazy"
+      },
+      "priority": 0,
+      "apply-to": "queues"
+    }
+  ]
+}
